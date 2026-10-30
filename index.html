@@ -38,6 +38,9 @@ button,input,select,textarea{font:inherit}button{border:1px solid var(--line);bo
 .meter{height:8px;border-radius:9px;background:#0c1524;overflow:hidden;border:1px solid var(--line)}.meter i{display:block;height:100%;width:0;background:var(--mint);transition:width .08s}
 .stats{display:flex;gap:10px}.stats div{flex:1;background:#0f1929;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;font-size:11px;color:var(--muted)}.stats b{display:block;font-size:20px;color:var(--mint)}
 .footer{text-align:center;color:#8191a7;font-size:11px;padding:22px 0 6px}kbd{background:#24334a;border-radius:5px;padding:1px 6px;font-size:11px}
+.sent{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;background:#0f1929}.sent.act{border-color:var(--mint);background:#14312c}.sent p{margin:0 0 4px;font-size:14px}.sent .row button{padding:6px 10px;min-height:40px;font-size:13px;flex:1 1 auto}
+canvas{width:100%;display:block;border-radius:8px;background:#0c1524}#zoomCv{background:#060a11}.zoomrow{display:grid;gap:6px}.zoomrow label{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}.zoomrow input{flex:1;accent-color:var(--mint)}
+.saveditem button{min-height:36px}details summary{cursor:pointer;padding:8px 0;font-weight:650}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.sidebar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .bigplay{position:absolute;z-index:2;width:84px;height:84px;border-radius:50%;background:#000a;border:2px solid var(--mint);color:var(--mint);font-size:34px;padding:0;display:grid;place-items:center;left:50%;top:50%;transform:translate(-50%,-50%)}
 .transport{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#0e1726;border-top:1px solid var(--line)}.transport button{padding:0;min-width:46px;height:46px;flex:0 0 auto}.transport #playBtn{min-width:58px;font-size:20px}.transport .seek{flex:1;min-width:0;height:34px}.transport .time{white-space:nowrap}
@@ -92,9 +95,27 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}input,textarea,sele
   </div>
  </section>
 
+ <section class="panel" id="sentPanel">
+  <div class="panelhead"><div><h2>Sentence practice</h2><p>Practice one sentence at a time</p></div><button id="splitBtn">Split transcript</button></div>
+  <div class="panelbody"><div class="row"><button id="tapSync">⏱ Tap-sync timing</button><button id="tapNext" class="primary" disabled>Next sentence starts now</button></div>
+   <div class="meta">Steps: 1) Paste the transcript below. 2) Tap Split. 3) Tap-sync while the video plays. 4) Practice any sentence — it repeats until you pause.</div>
+   <div id="sentList"></div></div>
+ </section>
+
  <section class="panel latest">
   <div class="panelhead"><div><h2>Review your latest recording</h2><p>Watch yourself right after you save</p></div><div class="row"><select id="lastSpeed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></div></div>
-  <div class="panelbody"><div class="meta" id="lastMeta">No recording yet. Your latest take will appear here.</div><video id="lastVideo" controls playsinline class="hidden"></video></div>
+  <div class="panelbody"><div class="meta" id="lastMeta">No recording yet. Your latest take will appear here.</div><video id="lastVideo" controls playsinline class="hidden"></video>
+   <canvas id="zoomCv" class="hidden"></canvas>
+   <div class="zoomrow"><label>🔍 Mouth zoom<input type="range" id="zm" min="1" max="4" step="0.1" value="1"></label><label>↔<input type="range" id="zx" min="0" max="100" value="50"></label><label>↕<input type="range" id="zy" min="0" max="100" value="45"></label></div>
+   <div class="meta">Move the zoom above 1× to see a close-up. Use 0.75× speed to watch your lips and tongue.</div>
+   <div class="row" id="rate"></div></div>
+ </section>
+
+ <section class="panel">
+  <div class="panelhead"><div><h2>Compare with the speaker</h2><p>Waveform and pace of your latest take</p></div><button id="cmpBtn" class="primary" disabled>Build comparison</button></div>
+  <div class="panelbody"><canvas id="wfRef" style="height:70px"></canvas><canvas id="wfMe" style="height:70px"></canvas>
+   <div class="row"><button id="abPlay" disabled>▶ Play both together</button><button id="abStop" disabled>■ Stop</button><label class="check"><input type="checkbox" id="abMuteRef"> Mute the speaker</label></div>
+   <div class="meta" id="cmpMeta">Save or select a take, then tap “Build comparison”.</div></div>
  </section>
 
  <section class="grid2">
@@ -109,12 +130,21 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}input,textarea,sele
    <label class="check"><input type="checkbox" class="rc"> I repeated the difficult section.</label></div>
    <div class="row" style="margin-top:10px"><button id="resetCheck">Reset checklist</button></div></div>
  </section>
+ <section class="grid2">
+  <div class="card"><h3>Difficult words</h3><p>Add words you want to master. Tap Listen, then say each word clearly.</p>
+   <div class="row"><input id="wordIn" type="text" placeholder="e.g. thoroughly" style="flex:1 1 60%"><button id="wordAdd" style="flex:0 0 auto">Add</button></div>
+   <div class="row" style="margin:8px 0"><button id="wordSel">＋ Selected transcript words</button><button id="wordDrill" class="primary">Drill mode</button></div>
+   <div id="drill" class="hidden status" style="text-align:center"><div id="drillWord" style="font-size:30px;font-weight:800;color:var(--mint);margin:6px 0"></div><div class="meta" id="drillCount"></div><div class="row" style="margin-top:8px"><button id="drillPrev">◀</button><button id="drillSay">🔊</button><button id="drillNext">▶</button><button id="drillClose" class="subtle">Close</button></div></div>
+   <div id="wordList"></div></div>
+  <div class="card"><h3>Sound drills</h3><p>Tap a word or phrase to listen (needs a voice on your device), then say it yourself.</p><div id="drills"></div></div>
+ </section>
 </main>
 
 <aside class="sidebar">
  <section class="card"><h3>Your progress</h3><div class="stats"><div><b id="stDays">0</b>day streak</div><div><b id="stToday">0</b>takes today</div><div><b id="stTotal">0</b>total takes</div></div></section>
  <section class="card"><h3>Take details</h3><label class="l" for="takeName">Recording name</label><input type="text" id="takeName" maxlength="70" placeholder="e.g. Day 1 — pauses and clarity"><label class="l" for="focus">Today's focus</label><input type="text" id="focus" maxlength="100" placeholder="e.g. Speak slowly and finish words"><div class="status" style="margin-top:12px">Tip: start with a 10–30 second section. Repeat it until the rhythm feels natural.</div></section>
- <section class="card"><h3>Saved recordings</h3><p>Kept in this page until you close it. Each take is also downloaded to your device.</p><div id="savedList"><div class="meta">No recordings saved in this session yet.</div></div><div class="row"><button id="clearSaved" class="subtle">Clear list</button></div></section>
+ <section class="card"><h3>Saved recordings</h3><p>Stored inside the app on this device, so they are still here next time. Tap Download to also keep a copy in your files.</p><div id="savedList"></div><div class="meta" id="storeInfo"></div><div class="row"><button id="clearSaved" class="subtle">Delete all</button></div></section>
+ <section class="card"><h3>Take ratings</h3><p>Rate each take with 1–5 stars in the review panel to see your progress.</p><canvas id="histCv" style="height:90px"></canvas></section>
  <section class="card"><h3>Quick setup</h3><div class="checklist"><label class="check"><input type="checkbox"> Sit where your face and hands are visible.</label><label class="check"><input type="checkbox"> Use headphones so the speaker's voice is not recorded.</label><label class="check"><input type="checkbox"> Choose a short clip with clear speech.</label><label class="check"><input type="checkbox"> Watch the speaker once before shadowing.</label></div></section>
 </aside>
 </div>
@@ -132,7 +162,8 @@ const el=(tag,txt,cls)=>{const e=document.createElement(tag);if(txt!=null)e.text
 
 /* ---------- Reference video ---------- */
 const vBtns=['bigPlay','playBtn','backBtn','fwdBtn','restartBtn','startMark','endMark','loopBtn','clearSec','seek'];
-$('videoFile').onchange=e=>{const f=e.target.files?.[0];if(!f)return;if(refUrl)URL.revokeObjectURL(refUrl);refUrl=URL.createObjectURL(f);ref.src=refUrl;ref.classList.remove('hidden');$('refPh').classList.add('hidden');vBtns.forEach(i=>$(i).disabled=false);sStart=sEnd=null;loop=false;secUI();status(`Loaded ${f.name} (${(f.size/1048576).toFixed(1)} MB). Enable your camera, then start recording.`,'ok')};
+function loadRef(f,restored){refBlob=f;if(refUrl)URL.revokeObjectURL(refUrl);refUrl=URL.createObjectURL(f);ref.src=refUrl;ref.classList.remove('hidden');$('refPh').classList.add('hidden');vBtns.forEach(i=>$(i).disabled=false);sStart=sEnd=null;loop=false;secUI();status(restored?`Restored your last video: ${f.name}. Enable your camera to practice.`:`Loaded ${f.name} (${(f.size/1048576).toFixed(1)} MB). Enable your camera, then start recording.`,'ok')}
+$('videoFile').onchange=e=>{const f=e.target.files?.[0];if(!f)return;loadRef(f);if(store.get('ssRefName')!==f.name){sents.forEach(s=>{s.s=null;s.e=null});saveSents();renderSents();store.set('ssRefName',f.name)}dbop('kv','readwrite',o=>o.put({k:'ref',blob:f,name:f.name})).then(k=>status(k?`Loaded ${f.name}. It is saved in the app, so it will be here next time.`:`Loaded ${f.name}, but it could not be saved for next time (storage may be full).`,k?'ok':'error'))};
 const vUI=()=>{$('vTime').textContent=`${fmt(ref.currentTime)} / ${fmt(ref.duration)}`;if(ref.duration)$('seek').value=ref.currentTime/ref.duration*1000;$('playBtn').textContent=ref.paused?'▶':'Ⅱ';$('bigPlay').classList.toggle('hidden',!ref.src||!ref.paused);$('bigPlay').textContent=ref.ended?'↺':'▶';if(loop&&sEnd!=null&&ref.currentTime>=sEnd){ref.currentTime=sStart||0;ref.play().catch(()=>{})}};
 ['timeupdate','loadedmetadata','play','pause'].forEach(ev=>ref.addEventListener(ev,vUI));
 const toggle=()=>{if(!ref.src)return;ref.paused?ref.play().catch(()=>status('This video format cannot be played here. Try MP4 or WebM.','error')):ref.pause()};
@@ -197,20 +228,128 @@ function stopRecording(){
  if(recorder&&recorder.state!=='inactive')recorder.stop();
 }
 $('recordBtn').onclick=beginRecording;$('stopBtn').onclick=stopRecording;
-function save(){
+/* ---------- Offline storage (IndexedDB) ---------- */
+const dbReady=new Promise(res=>{try{const r=indexedDB.open('shadowing-studio',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('takes',{keyPath:'id',autoIncrement:true});d.createObjectStore('kv',{keyPath:'k'})};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}});
+const dbop=(s,m,fn)=>dbReady.then(d=>d?new Promise(res=>{try{const tx=d.transaction(s,m),rq=fn(tx.objectStore(s));tx.oncomplete=()=>res(rq&&rq.result!==undefined?rq.result:true);tx.onerror=tx.onabort=()=>res(null)}catch(e){res(null)}}):null);
+let memTakes=[],lastTake=null,refBlob=null,peaks=null;
+const putTake=async t=>{if(await dbReady){const k=await dbop('takes','readwrite',o=>o.put(t));if(k!=null&&k!==true)return k}if(!t.id)t.id=Date.now();const i=memTakes.findIndex(x=>x.id===t.id);i<0?memTakes.push(t):memTakes[i]=t;return t.id};
+const takesAll=async()=>(await dbReady)?((await dbop('takes','readonly',o=>o.getAll()))||[]).filter(x=>x&&x.blob).concat(memTakes):memTakes;
+const delTake=async id=>{memTakes=memTakes.filter(x=>x.id!==id);if(await dbReady)await dbop('takes','readwrite',o=>o.delete(id))};
+const clearTakes=async()=>{memTakes=[];if(await dbReady)await dbop('takes','readwrite',o=>o.clear())};
+
+/* ---------- Save a take ---------- */
+const lv=$('lastVideo');
+async function save(){
  clearInterval(tick);$('dot').classList.remove('live');camBox.classList.remove('rec');$('recLabel').textContent='Ready';$('stopBtn').disabled=true;$('recordBtn').disabled=!stream;$('cameraBtn').disabled=false;$('switchBtn').disabled=!stream;ref.pause();try{wake?.release();wake=null}catch(e){}
  if(!chunks.length)return status('No data was captured. Please try again.','error');
- const type=recorder.mimeType||'video/webm',blob=new Blob(chunks,{type}),ext=type.includes('mp4')?'mp4':'webm',dur=fmt((Date.now()-t0)/1000);saved++;
- const title=$('takeName').value.trim()||`Shadowing take ${saved}`,fname=(title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,60)||`take-${saved}`)+'.'+ext,url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
- const lv=$('lastVideo');lv.src=url;lv.classList.remove('hidden');lv.playbackRate=+$('lastSpeed').value;$('lastMeta').textContent=`${title} · ${dur} · ${(blob.size/1048576).toFixed(1)} MB`;lv.scrollIntoView({behavior:'smooth',block:'nearest'});
- const list=$('savedList');if(!list.querySelector('.saveditem'))list.innerHTML='';
- const it=el('div',null,'saveditem'),dl=el('a','Download again'),pl=el('button','Play');dl.href=url;dl.download=fname;pl.onclick=()=>{lv.src=url;lv.play();lv.scrollIntoView({behavior:'smooth',block:'nearest'})};
- it.append(el('strong',title),el('small',`${new Date().toLocaleTimeString()} · ${dur} · ${(blob.size/1048576).toFixed(1)} MB`),el('br'),pl,dl);list.prepend(it);
- bump();status(`Saved. Download started: ${fname}. Review your take below, then tick the checklist.`,'ok');
+ const type=recorder.mimeType||'video/webm',blob=new Blob(chunks,{type}),ext=type.includes('mp4')?'mp4':'webm',secs=(Date.now()-t0)/1000;saved++;
+ const title=$('takeName').value.trim()||`Shadowing take ${saved}`,fname=(title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,60)||`take-${saved}`)+'.'+ext;
+ const take={title,fname,type,blob,secs,at:Date.now(),rating:0,refOffset:($('autoPlay').checked&&ref.src)?(sStart??0):null,refSpan:(sStart!=null&&sEnd!=null)?sEnd-sStart:null};
+ dlTake(take);try{navigator.storage?.persist?.()}catch(e){}
+ take.id=await putTake(take);showTake(take);renderSaved();bump();
+ status(`Saved inside the app and downloaded as ${fname}. Review your take below, then rate it.`,'ok');
 }
-$('lastSpeed').onchange=()=>$('lastVideo').playbackRate=+$('lastSpeed').value;
-$('clearSaved').onclick=()=>{if(confirm('Clear this list? Downloaded files stay on your device.')){$('savedList').innerHTML='<div class="meta">No recordings saved in this session yet.</div>'}};
+function dlTake(t){const u=URL.createObjectURL(t.blob),a=document.createElement('a');a.href=u;a.download=t.fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
+function showTake(t,scroll=true){
+ stopAB();if(lastUrl)URL.revokeObjectURL(lastUrl);lastTake=t;lastUrl=URL.createObjectURL(t.blob);lv.src=lastUrl;lv.classList.remove('hidden');lv.playbackRate=+$('lastSpeed').value;
+ lv.onloadedmetadata=()=>{if(lv.duration===Infinity){lv.currentTime=1e101;lv.ontimeupdate=()=>{lv.ontimeupdate=null;lv.currentTime=0}}};
+ $('lastMeta').textContent=`${t.title} · ${fmt(t.secs)} · ${(t.blob.size/1048576).toFixed(1)} MB`;$('cmpBtn').disabled=false;peaks=null;$('abPlay').disabled=true;
+ drawWave($('wfRef'),null,'',null);drawWave($('wfMe'),null,'',null);$('cmpMeta').textContent='Tap “Build comparison” to see waveforms and pace.';renderRate();
+ if(scroll)lv.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('lastSpeed').onchange=()=>lv.playbackRate=+$('lastSpeed').value;
+function renderRate(){const r=$('rate');r.innerHTML='';r.append(el('span','Rate this take:','time'));for(let i=1;i<=5;i++){const b=el('button','★');b.style.cssText='flex:0 0 auto;padding:6px 10px;min-height:40px;background:'+(lastTake&&lastTake.rating>=i?'#7a5d10':'#24334a');b.onclick=async()=>{if(!lastTake)return;lastTake.rating=lastTake.rating===i?0:i;await putTake(lastTake);renderRate();renderSaved()};r.append(b)}}
+async function renderSaved(){
+ const list=$('savedList'),a=await takesAll();a.sort((x,y)=>y.at-x.at);list.innerHTML='';
+ if(!a.length)list.append(el('div','No saved recordings yet.','meta'));
+ a.forEach(t=>{const it=el('div',null,'saveditem'),pl=el('button','Review'),dl=el('button','Download'),rm=el('button','Delete'),d=new Date(t.at);
+  it.append(el('strong',t.title),el('small',`${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · ${fmt(t.secs)} · ${(t.blob.size/1048576).toFixed(1)} MB${t.rating?' · '+'★'.repeat(t.rating):''}`),el('br'),pl,dl,rm);
+  pl.onclick=()=>showTake(t);dl.onclick=()=>dlTake(t);
+  rm.onclick=async()=>{if(!confirm('Delete this recording from the app?'))return;await delTake(t.id);if(lastTake&&lastTake.id===t.id){stopAB();lv.removeAttribute('src');lv.classList.add('hidden');lastTake=null;$('lastMeta').textContent='No recording selected.';$('cmpBtn').disabled=true;renderRate()}renderSaved()};
+  list.append(it)});
+ drawChart(a);try{navigator.storage?.estimate?.().then(e=>{$('storeInfo').textContent=`App storage used: ${(e.usage/1048576).toFixed(0)} MB`})}catch(e){}
+}
+$('clearSaved').onclick=async()=>{if(!confirm('Delete ALL saved recordings from the app? Files you downloaded stay on your device.'))return;await clearTakes();stopAB();lv.removeAttribute('src');lv.classList.add('hidden');lastTake=null;$('lastMeta').textContent='No recording selected.';$('cmpBtn').disabled=true;renderRate();renderSaved()};
+function drawChart(a){const c=$('histCv'),dpr=devicePixelRatio||1,w=c.clientWidth||280,h=90;c.width=w*dpr;c.height=h*dpr;const g=c.getContext('2d');g.scale(dpr,dpr);g.clearRect(0,0,w,h);const d=[...a].sort((x,y)=>x.at-y.at).slice(-14);
+ if(!d.some(t=>t.rating)){g.fillStyle='#8191a7';g.font='12px system-ui';g.fillText('Rate your takes to see progress',10,48);return}
+ const bw=w/14;d.forEach((t,i)=>{const bh=(t.rating||0)/5*(h-22);g.fillStyle=t.rating?'#76e0c1':'#2b3a50';g.fillRect(i*bw+4,h-16-(t.rating?bh:3),bw-8,t.rating?bh:3);g.fillStyle='#a8b6ca';g.font='10px system-ui';g.fillText(String(i+1),i*bw+bw/2-3,h-4)})}
+window.addEventListener('resize',()=>renderSaved());
+
+/* ---------- Mouth zoom close-up ---------- */
+const zc=$('zoomCv');
+function drawZoom(){const z=+$('zm').value;if(z<=1||!lv.videoWidth||lv.classList.contains('hidden')){zc.classList.add('hidden');return}zc.classList.remove('hidden');const vw=lv.videoWidth,vh=lv.videoHeight,sw=vw/z,sh=vh/z;zc.width=640;zc.height=Math.round(640*vh/vw);try{zc.getContext('2d').drawImage(lv,(vw-sw)*$('zx').value/100,(vh-sh)*$('zy').value/100,sw,sh,0,0,zc.width,zc.height)}catch(e){}}
+['zm','zx','zy'].forEach(i=>$(i).oninput=drawZoom);['timeupdate','seeked','loadeddata','play','pause'].forEach(e=>lv.addEventListener(e,drawZoom));
+(function zl(){if(!lv.paused&&!lv.ended)drawZoom();requestAnimationFrame(zl)})();
+
+/* ---------- A/B comparison with the speaker ---------- */
+const AC=window.AudioContext||window.webkitAudioContext;let abRaf=null,abOn=false;
+async function decode(blob){const ctx=new AC();try{return await ctx.decodeAudioData(await blob.arrayBuffer())}finally{ctx.close().catch(()=>{})}}
+function peaksOf(buf,from,len,n){const d=buf.getChannelData(0),sr=buf.sampleRate,out=new Float32Array(n),a=Math.floor(from*sr),step=Math.max(1,Math.floor(len*sr/n)),skip=Math.max(1,step>>6);let mx=0;for(let i=0;i<n;i++){let m=0;const s=a+i*step,e=Math.min(d.length,s+step);for(let j=s;j<e;j+=skip){const v=Math.abs(d[j]);if(v>m)m=v}out[i]=m;if(m>mx)mx=m}return out.map(v=>v/(mx||1))}
+function drawWave(cv,pk,color,pos){const dpr=devicePixelRatio||1,w=cv.clientWidth||300,h=70;cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);g.fillStyle='#0c1524';g.fillRect(0,0,w,h);if(pk){g.fillStyle=color;const bw=w/pk.length;pk.forEach((v,i)=>{const bh=Math.max(1,v*(h-8));g.fillRect(i*bw,(h-bh)/2,Math.max(1,bw-.5),bh)})}if(pos!=null){g.fillStyle='#fff';g.fillRect(pos*w,0,2,h)}}
+$('cmpBtn').onclick=async()=>{
+ if(!lastTake||!AC)return;const m=$('cmpMeta');m.textContent='Analyzing…';stopAB();const secs=lastTake.secs;peaks={me:null,ref:null};let notes=[];
+ try{const b=await decode(lastTake.blob);peaks.me=peaksOf(b,0,b.duration,700);peaks.len=b.duration}catch(e){notes.push('Your take’s audio could not be analyzed on this browser.')}
+ if(lastTake.refOffset==null)notes.push('The speaker waveform needs “Play the reference video when recording starts” to be on.');
+ else if(!refBlob)notes.push('Load the reference video to compare.');
+ else if(refBlob.size>250*1048576)notes.push('The reference file is too large for a waveform (over 250 MB).');
+ else try{const b=await decode(refBlob);peaks.ref=peaksOf(b,lastTake.refOffset,peaks.len||secs,700)}catch(e){notes.push('A waveform is not available for this video format.')}
+ drawWave($('wfRef'),peaks.ref,'#76e0c1',null);drawWave($('wfMe'),peaks.me,'#ffd166',null);
+ const words=($('transcript').value.match(/[\w’'-]+/g)||[]).length,sp=lastTake.refSpan;let t=`Your take: ${fmt(secs)}.`;
+ if(sp)t+=` Speaker section: ${fmt(sp)} → you were ${Math.abs(Math.round((secs/sp-1)*100))}% ${secs>sp?'slower':'faster'}.`;
+ if(words>=5)t+=` Transcript: ${words} words ≈ ${Math.round(words/secs*60)} words per minute if your take covers all of it.`;
+ m.textContent=(t+' Top: speaker (green). Bottom: you (yellow). '+notes.join(' ')).trim();
+ $('abPlay').disabled=!(ref.src&&lastTake.refOffset!=null);
+};
+$('abPlay').onclick=()=>{if(!lastTake||!ref.src||lastTake.refOffset==null)return;loop=false;secUI();document.querySelector('.speeds [data-s="1"]').click();lv.playbackRate=1;abOn=true;ref.muted=$('abMuteRef').checked;ref.currentTime=lastTake.refOffset;lv.currentTime=0;ref.play().catch(()=>{});lv.play().catch(()=>{});$('abStop').disabled=false;abAnim()};
+$('abMuteRef').onchange=()=>{if(abOn)ref.muted=$('abMuteRef').checked};
+function stopAB(){if(!abOn)return;abOn=false;cancelAnimationFrame(abRaf);ref.pause();lv.pause();ref.muted=false;$('abStop').disabled=true}
+$('abStop').onclick=stopAB;lv.addEventListener('ended',stopAB);
+function abAnim(){if(!abOn)return;const p=Math.min(1,lv.currentTime/(lastTake.secs||1));drawWave($('wfRef'),peaks&&peaks.ref,'#76e0c1',p);drawWave($('wfMe'),peaks&&peaks.me,'#ffd166',p);if(p>=1)return stopAB();abRaf=requestAnimationFrame(abAnim)}
+
+/* ---------- Sentence-by-sentence practice ---------- */
+let sents=[],tap=-1,actSent=-1;try{sents=JSON.parse(store.get('ssSents','[]'))}catch(e){}
+const saveSents=()=>store.set('ssSents',JSON.stringify(sents));
+function practice(i){const s=sents[i];if(!ref.src){status('Load a video first.','error');return false}if(s.s==null||s.e==null||s.e<=s.s){status('Set this sentence’s timing first: use Tap-sync, or mark a section and tap “Use marked section”.','error');return false}
+ sStart=s.s;sEnd=s.e;loop=true;secUI();actSent=i;ref.currentTime=s.s;ref.play().catch(()=>{});renderSents();stage.scrollIntoView({behavior:'smooth',block:'center'});status(`Practicing sentence ${i+1}. It repeats until you press pause.`,'ok');return true}
+function renderSents(){const Lr=$('sentList'),act=tap>=0?tap:actSent;Lr.innerHTML='';
+ if(!sents.length){Lr.append(el('div','No sentences yet. Add a transcript below, then tap “Split transcript”.','meta'));return}
+ sents.forEach((s,i)=>{const d=el('div',null,'sent'+(i===act?' act':'')),r=el('div',null,'row'),b1=el('button','▶ Practice'),b2=el('button','● Practice & record'),b3=el('button','🔗 Use marked section');
+  b1.onclick=()=>practice(i);b2.onclick=()=>{if(!stream)return status('Enable your camera first.','error');if(practice(i))beginRecording()};
+  b3.onclick=()=>{if(sStart==null||sEnd==null)return status('Mark a section start and end first (Reference controls).','error');s.s=sStart;s.e=sEnd;saveSents();renderSents()};
+  r.append(b1,b2,b3);d.append(el('p',`${i+1}. ${s.t}`),el('div',s.s==null?'No timing yet':`Timing: ${fmt(s.s)} → ${s.e==null?'?':fmt(s.e)}`,'meta'),r);Lr.append(d)})}
+$('splitBtn').onclick=()=>{const t=$('transcript').value.replace(/\s+/g,' ').trim();if(!t)return status('Add a transcript first.','error');
+ const m=t.match(/[^.!?…]+(?:[.!?…]+["'”’)\]]*|$)/g)||[],old=sents;sents=m.map(x=>x.trim()).filter(x=>x.length>1).slice(0,300).map(x=>{const o=old.find(q=>q.t===x);return{t:x,s:o?o.s:null,e:o?o.e:null}});saveSents();tap=-1;actSent=-1;renderSents();status(`Split into ${sents.length} sentences. Now use Tap-sync to time them.`,'ok')};
+$('tapSync').onclick=()=>{if(!sents.length)return status('Split the transcript first.','error');if(!ref.src)return status('Load a video first.','error');tap=0;sents.forEach(s=>{s.s=null;s.e=null});loop=false;secUI();ref.currentTime=0;ref.play().catch(()=>{});$('tapNext').disabled=false;renderSents();status('Tap-sync started. Press “Next sentence starts now” exactly when each sentence begins.','ok')};
+$('tapNext').onclick=()=>{if(tap<0)return;const t=ref.currentTime;sents[tap].s=t;if(tap>0)sents[tap-1].e=t;tap++;
+ if(tap>=sents.length){sents[sents.length-1].e=ref.duration||t+5;tap=-1;$('tapNext').disabled=true;ref.pause();saveSents();status('Timing complete. Tap Practice on any sentence.','ok')}else{saveSents();status(`Sentence ${tap} timed. Next: sentence ${tap+1}.`)}renderSents()};
+
+/* ---------- Difficult words + sound drills ---------- */
+let words=[],dq=[],di=0;try{words=JSON.parse(store.get('ssWords','[]'))}catch(e){}
+const saveWords=()=>store.set('ssWords',JSON.stringify(words));
+const speak=t=>{try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=.85;speechSynthesis.speak(u)}catch(e){status('Speech playback is not available on this device.','error')}};
+function addWord(w){w=w.trim().slice(0,60);if(w&&!words.some(x=>x.w.toLowerCase()===w.toLowerCase()))words.push({w,done:false})}
+function renderWords(){const Lr=$('wordList');Lr.innerHTML='';if(!words.length)Lr.append(el('div','No words yet.','meta'));
+ words.forEach((w,i)=>{const d=el('div',null,'saveditem'),s=el('button','🔊 Listen'),k=el('button',w.done?'Undo':'✓ Mastered'),x=el('button','Remove');s.onclick=()=>speak(w.w);k.onclick=()=>{w.done=!w.done;saveWords();renderWords()};x.onclick=()=>{words.splice(i,1);saveWords();renderWords()};d.append(el('strong',(w.done?'✓ ':'')+w.w),s,k,x);Lr.append(d)})}
+$('wordAdd').onclick=()=>{addWord($('wordIn').value);$('wordIn').value='';saveWords();renderWords()};
+$('wordIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('wordAdd').click()});
+$('wordSel').onclick=()=>{const t=$('transcript'),sel=t.value.substring(t.selectionStart,t.selectionEnd);const ws=[...new Set((sel.match(/[A-Za-z][\w’'-]*/g)||[]))].slice(0,10);if(!ws.length)return status('Select some words in the transcript box first.','error');ws.forEach(addWord);saveWords();renderWords();status(`Added ${ws.length} word(s).`,'ok')};
+function showDrill(){$('drillWord').textContent=dq[di];$('drillCount').textContent=`${di+1} / ${dq.length}`;speak(dq[di])}
+$('wordDrill').onclick=()=>{dq=words.filter(w=>!w.done).map(w=>w.w).sort(()=>Math.random()-.5);if(!dq.length)return status('Add some words first (or they are all mastered).','error');di=0;$('drill').classList.remove('hidden');showDrill()};
+$('drillPrev').onclick=()=>{di=(di-1+dq.length)%dq.length;showDrill()};$('drillNext').onclick=()=>{di=(di+1)%dq.length;showDrill()};$('drillSay').onclick=()=>speak(dq[di]);$('drillClose').onclick=()=>$('drill').classList.add('hidden');
+const DRILLS=[
+{t:'“th” sounds',tip:'Put the tip of your tongue lightly between your teeth, then let the air flow.',i:['think','three','thought','this','that','though','thorough','weather']},
+{t:'“r” and “l”',tip:'For “r” the tongue does not touch the roof of your mouth. For “l” the tip touches just behind the top teeth.',i:['right','light','road','load','red','led','correct','collect','fry','fly']},
+{t:'“v” and “w”',tip:'For “v” your top teeth touch your lower lip. For “w” your lips round and do not touch your teeth.',i:['very','wary','vest','west','vine','wine','veil','whale']},
+{t:'Word endings',tip:'Say the last sound clearly: /t/ in worked, /s/ in helps, /ts/ in texts.',i:['worked','asked','helped','lists','texts','months','friends','changed']},
+{t:'Word stress',tip:'Make the stressed syllable longer, louder and higher.',i:['photograph','photographer','photographic','important','communication','develop','opportunity','comfortable']},
+{t:'Sentence rhythm',tip:'Stress the key words and glide quickly through small words like to, of, and, the.',i:['Tell me what you think.','Could you say that again?','I’d like to ask a question.','What do you want to do today?']}];
+DRILLS.forEach(dr=>{const d=document.createElement('details'),s=el('summary',dr.t),w=el('div',null,'row');d.style.margin='6px 0';dr.i.forEach(x=>{const b=el('button','🔊 '+x);b.style.flex='0 0 auto';b.onclick=()=>speak(x);w.append(b)});d.append(s,el('p',dr.tip,'meta'),w);$('drills').append(d)});
+
+/* ---------- Start-up: restore saved data ---------- */
+(async()=>{renderSents();renderWords();renderRate();
+ const a=await takesAll();a.sort((x,y)=>y.at-x.at);if(a[0])showTake(a[0],false);renderSaved();
+ const r=await dbop('kv','readonly',o=>o.get('ref'));if(r&&r.blob){loadRef(new File([r.blob],r.name||'reference-video',{type:r.blob.type}),true)}})();
+
 
 /* ---------- Progress ---------- */
 const day=d=>d.toISOString().slice(0,10);
